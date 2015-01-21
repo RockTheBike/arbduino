@@ -72,13 +72,15 @@ void halves( unsigned long offset ) {
 
 int button_push_count = 0;
 bool prev_button_state = 0;  // false=>closed; true=>open
-void check_button() {
+bool check_button() {
 	pinMode( PIN_PIXEL, INPUT_PULLUP );
 	bool cur_button_state = digitalRead( PIN_PIXEL );
-	if( cur_button_state && ! prev_button_state )
+	bool released = cur_button_state && ! prev_button_state;
+	if( released )
 		button_push_count++;
 	prev_button_state = cur_button_state;
 	pinMode( PIN_PIXEL, OUTPUT );
+	return( released );
 }
 
 void report() {
@@ -92,14 +94,15 @@ void report() {
 	Serial.println();
 }
 
+int sprite_pos = 0;
 void loop() {
 	time = millis();
 	//draw_strip( loopcount%NUM_PIXELS );
 	//draw_bits( loopcount );
 	//fast_chase( loopcount%NUM_PIXELS );
-	sprite( loopcount%NUM_PIXELS );
 	//halves( loopcount );
-	check_button();
+	sprite( sprite_pos );
+	sprite_pos = check_button() ? 0 : (sprite_pos+1)%NUM_PIXELS;
 	if( time > next_report_time ) {
 		report();
 		next_report_time += REPORT_INTERVAL;
