@@ -4,16 +4,14 @@
 #include <Adafruit_NeoPixel.h>
 
 unsigned long time = 0;
-unsigned long tickcount = 0;
+unsigned long loopcount = 0;
 #define REPORT_INTERVAL 1000
 unsigned long next_report_time = 0;
 
 
-#define PIN_PIXEL 11
-#define OTHER_PIN_PIXEL 12
-#define NUM_PIXELS 60
+#define PIN_PIXEL 13
+#define NUM_PIXELS 150
 Adafruit_NeoPixel strip( NUM_PIXELS, PIN_PIXEL, NEO_GRB|NEO_KHZ800 );
-Adafruit_NeoPixel otherstrip( NUM_PIXELS, OTHER_PIN_PIXEL, NEO_GRB|NEO_KHZ800 );
 
 
 void setup() {
@@ -21,8 +19,6 @@ void setup() {
 	Serial.println(VERSION);
 	strip.begin();
 	strip.show(); // Initialize all pixels to 'off'
-	otherstrip.begin();
-	otherstrip.show(); // Initialize all pixels to 'off'
 }
 
 void draw_strip( int spot ) {
@@ -74,36 +70,40 @@ void halves( unsigned long offset ) {
 	strip.show();
 }
 
-void otherhalves( unsigned long offset ) {
-	static const uint32_t colors[] = {
-	  Adafruit_NeoPixel::Color(0,128,128),
-	  Adafruit_NeoPixel::Color(128,128,0),
-	  Adafruit_NeoPixel::Color(128,0,128) };
-	for( unsigned int i=0; i<NUM_PIXELS; i++ ) {
-		int idx = (offset+i) % (3*NUM_PIXELS/2) / (NUM_PIXELS/2);
-		otherstrip.setPixelColor( i, colors[idx] );
-	}
-	otherstrip.show();
+int button_push_count = 0;
+bool prev_button_state = 0;  // false=>closed; true=>open
+void check_button() {
+	pinMode( PIN_PIXEL, INPUT_PULLUP );
+	bool cur_button_state = digitalRead( PIN_PIXEL );
+	if( cur_button_state && ! prev_button_state )
+		button_push_count++;
+	prev_button_state = cur_button_state;
+	pinMode( PIN_PIXEL, OUTPUT );
 }
 
 void report() {
-	Serial.print("Still alive at ");
-	Serial.print(tickcount);
-	Serial.println("...");
+	Serial.print("After ");
+	Serial.print(loopcount);
+	Serial.print("loops:  button:");
+	Serial.print(prev_button_state);
+	Serial.print(", pushed ");
+	Serial.print(button_push_count);
+	Serial.print("times");
+	Serial.println();
 }
 
 void loop() {
 	time = millis();
-	//draw_strip( tickcount%NUM_PIXELS );
-	//draw_bits( tickcount );
-	//fast_chase( tickcount%NUM_PIXELS );
-	//sprite( tickcount%NUM_PIXELS );
-	halves( tickcount );
-	otherhalves( tickcount );
+	//draw_strip( loopcount%NUM_PIXELS );
+	//draw_bits( loopcount );
+	//fast_chase( loopcount%NUM_PIXELS );
+	sprite( loopcount%NUM_PIXELS );
+	//halves( loopcount );
+	check_button();
 	if( time > next_report_time ) {
 		report();
-		next_report_time = time + REPORT_INTERVAL;
+		next_report_time += REPORT_INTERVAL;
 	}
-	tickcount++;
-	delay(300);
+	loopcount++;
+	delay(10);
 }
