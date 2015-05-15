@@ -1,7 +1,9 @@
-#define VERSION "Chase lots of lights"
+#define VERSION "BRX lights v1.1"
 
 #include "Arduino.h"
 #include <Adafruit_NeoPixel.h>
+
+#define ONLY_PLUS  // assume minus rail is 0V
 
 unsigned long time = 0;
 unsigned long loopcount = 0;
@@ -22,7 +24,7 @@ const int VOLTPINS[NUM_RAILS] = { VOLTPIN, MINUSVOLTPIN };
 int voltsAdc[NUM_RAILS];
 float voltsAdcAvg[NUM_RAILS];
 // volts[0] holds plus rail, volts[1] holds minus rail but should be positive
-float volts[NUM_RAILS];
+float volts[NUM_RAILS] = { 0, 0 };
 
 // pretty lights
 #define NUM_STRIPS 2
@@ -32,7 +34,7 @@ Adafruit_NeoPixel strips[] = {
 	Adafruit_NeoPixel( NUM_PIXELS, PIN_PIXELS[0], NEO_GRB|NEO_KHZ800 ),
 	Adafruit_NeoPixel( NUM_PIXELS, PIN_PIXELS[1], NEO_GRB|NEO_KHZ800 ) };
 
-#define LOW_VOLTAGE 24.0
+#define LOW_VOLTAGE 28.0
 
 
 void setup() {
@@ -126,7 +128,12 @@ void loop() {
 }
 
 void getVolts(){
-  for( int rail=0; rail<NUM_RAILS; rail++ ) {
+#ifdef ONLY_PLUS
+  const int max_rail = 1;
+#else
+  const int max_rail = 2;
+#endif
+  for( int rail=0; rail<max_rail; rail++ ) {
     voltsAdc[rail] = analogRead( VOLTPINS[rail] );
     voltsAdcAvg[rail] = average( voltsAdc[rail], voltsAdcAvg[rail] );
     volts[rail] =
