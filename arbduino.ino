@@ -16,11 +16,9 @@ Adafruit_NeoPixel ledStrip = Adafruit_NeoPixel(NUM_LEDS, LEDSTRIPPIN, NEO_GRB + 
 // levels at which each LED turns green (normally all red unless below first voltage)
 const float ledLevels[NUM_LEDS+1] = {
   10,  9, 10, 11.2, 12, 12.5, 13, 13.5, 14, 14.5, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27 };
-//red  1grn   2grn   3grn   4grn   5grn   6grn   white
 
 #define AVG_CYCLES 50 // average measured values over this many samples
 #define DISPLAY_INTERVAL 2000 // when auto-display is on, display every this many milli-seconds
-#define LED_UPDATE_INTERVAL 1000
 #define BLINK_PERIOD 600
 #define FAST_BLINK_PERIOD 150
 
@@ -44,10 +42,6 @@ int fastBlinkState = 0;
 int voltsAdc = 0;
 float voltsAdcAvg = 0;
 float volts = 0;
-
-int voltsBuckAdc = 0; // for measuring A1 voltage
-float voltsBuckAvg = 0; // for measuring A1 voltage
-float voltsBuck = 0; // averaged A1 voltage
 
 //Current related variables
 int ampsAdc = 0;
@@ -90,16 +84,11 @@ void setup() {
   dark = ledStrip.Color(0,0,0);
 
   timeDisplay = millis();
-  // setPwmFrequency(3,1); // this sets the frequency of PWM on pins 3 and 11 to 31,250 Hz
-  // setPwmFrequency(9,1); // this sets the frequency of PWM on pins 9 and 10 to 31,250 Hz
-  // digitalWrite(9,LOW);
-  // pinMode(9,OUTPUT); // this pin will control the transistors of the huge BUCK converter
 }
 
 void loop() {
   time = millis();
   getVolts();
-  // doBuck(); // adjust inverter voltage
   doSafety();
   //  getAmps();  // only if we have a current sensor
   //  calcWatts(); // also adds in knob value for extra wattage, unless commented out
@@ -120,62 +109,6 @@ void loop() {
     timeDisplay = time;
   }
 
-}
-
-#define BUCK_CUTIN 18 // voltage above which transistors can start working
-#define BUCK_CUTOUT 17.5 // voltage below which transistors can not function
-#define BUCK_VOLTAGE 18.1 // target voltage for laptop to be supplied with
-#define BUCK_VOLTPIN A1 // this pin measures inverter's MINUS TERMINAL voltage
-#define BUCK_HYSTERESIS 0.75 // volts above BUCK_VOLTAGE where we start regulatin
-#define BUCK_PWM_UPJUMP 0.03 // amount to raise PWM value if voltage is below BUCK_VOLTAGE
-#define BUCK_PWM_DOWNJUMP 0.15 // amount to lower PWM value if voltage is too high
-float buckPWM = 0; // PWM value of pin 9
-int lastBuckPWM = 0; // make sure we don't call analogWrite if already set right
-
-void doBuck() {
-  if (volts > BUCK_CUTIN) { // voltage is high enough to turn on transistors
-    if (volts <= BUCK_VOLTAGE) { // system voltage is lower than inverter target voltage
-      digitalWrite(9,HIGH); // turn transistors fully on, give full voltage to inverter
-      buckPWM = 0;
-    }
-
-    if ((volts > BUCK_VOLTAGE+BUCK_HYSTERESIS) && (buckPWM == 0)) { // begin PWM action
-      buckPWM = 220.0 * (1.0 - ((volts - BUCK_VOLTAGE) / BUCK_VOLTAGE)); // low best guess for initial PWM value
-      //      Serial.print("buckval=");
-      //      Serial.println(buckPWM);
-      analogWrite(9,(int) buckPWM); // actually set the thing in motion
-    }
-
-    if ((volts > BUCK_VOLTAGE)) { // && (buckPWM != 0)) { // adjust PWM value based on results
-      if (volts - voltsBuck > BUCK_VOLTAGE + BUCK_HYSTERESIS) { // inverter voltage is too high
-        buckPWM -= BUCK_PWM_DOWNJUMP; // reduce PWM value to reduce inverter voltage
-        if (buckPWM <= 0) {
-          //          Serial.print("0");
-          buckPWM = 0; // minimum PWM value
-        }
-        if (lastBuckPWM != (int) buckPWM) { // only if the PWM value has changed should we...
-          lastBuckPWM = (int) buckPWM;
-          //          Serial.print("-");
-          analogWrite(9,lastBuckPWM); // actually set the PWM value
-        }
-      }
-      if (volts - voltsBuck < BUCK_VOLTAGE) { // inverter voltage is too low
-        buckPWM += BUCK_PWM_UPJUMP; // increase PWM value to raise inverter voltage
-        if (buckPWM > 255.0) {
-          buckPWM = 255.0;
-          //          Serial.print("X");
-        }
-        if (lastBuckPWM != (int) buckPWM) { // only if the PWM value has changed should we...
-          lastBuckPWM = (int) buckPWM;
-          //          Serial.print("+");
-          analogWrite(9,lastBuckPWM); // actually set the PWM value
-        }
-      }
-    }
-  } 
-  if (volts < BUCK_CUTOUT) { // system voltage is too low for transistors
-    digitalWrite(9,LOW); // turn off transistors
-  }
 }
 
 void doSafety() {
@@ -262,10 +195,6 @@ void getVolts(){
   voltsAdc = analogRead(VOLTPIN);
   voltsAdcAvg = average(voltsAdc, voltsAdcAvg);
   volts = adc2volts(voltsAdcAvg);
-
-  voltsBuckAdc = analogRead(BUCK_VOLTPIN);
-  voltsBuckAvg = average(voltsBuckAdc, voltsBuckAvg);
-  voltsBuck = adc2volts(voltsBuckAvg);
 }
 
 float average(float val, float avg){
@@ -314,79 +243,5 @@ void printDisplay(){
   //  Serial.print(amps);
   //  Serial.print(", va: ");
   //  Serial.print(watts);
-  Serial.print("), voltsBuck: ");
-  Serial.print(voltsBuck);
-  Serial.print("v, laptop: ");
-  Serial.print(volts-voltsBuck);
-  Serial.print("v, buckval=");
-  Serial.println(buckPWM);
-
-  //  Serial.print(", Levels ");
-  //  for(i = 0; i < NUM_LEDS; i++) {
-  //    Serial.print(i);
-  //    Serial.print(": ");
-  //    Serial.print(ledState[i]);
-  //    Serial.print(", ");
-  //  }
-  //  Serial.println("");
-  // Serial.println();
-}
-
-void setPwmFrequency(int pin, int divisor) {
-  byte mode;
-  if(pin == 5 || pin == 6 || pin == 9 || pin == 10) {
-    switch(divisor) {
-    case 1: 
-      mode = 0x01; 
-      break;
-    case 8: 
-      mode = 0x02; 
-      break;
-    case 64: 
-      mode = 0x03; 
-      break;
-    case 256: 
-      mode = 0x04; 
-      break;
-    case 1024: 
-      mode = 0x05; 
-      break;
-    default: 
-      return;
-    }
-    if(pin == 5 || pin == 6) {
-      TCCR0B = TCCR0B & 0b11111000 | mode;
-    } 
-    else {
-      TCCR1B = TCCR1B & 0b11111000 | mode;
-    }
-  } 
-  else if(pin == 3 || pin == 11) {
-    switch(divisor) {
-    case 1: 
-      mode = 0x01; 
-      break;
-    case 8: 
-      mode = 0x02; 
-      break;
-    case 32: 
-      mode = 0x03; 
-      break;
-    case 64: 
-      mode = 0x04; 
-      break;
-    case 128: 
-      mode = 0x05; 
-      break;
-    case 256: 
-      mode = 0x06; 
-      break;
-    case 1024: 
-      mode = 0x7; 
-      break;
-    default: 
-      return;
-    }
-    TCCR2B = TCCR2B & 0b11111000 | mode;
-  }
+  Serial.println(")");
 }
